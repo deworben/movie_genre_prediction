@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn import preprocessing
 from sklearn.metrics import confusion_matrix
@@ -24,11 +25,25 @@ test_labels = pd.read_csv('./data/valid_labels.tsv', sep='\t')
 # enc.fit(train_features["tag"].values.reshape(-1, 1))
 # print(enc.categories_)
 
+#an array with all of the possible tag values
+all_tags = np.array([])
+for value in train_features['tag'].values:
+   all_tags = np.append(all_tags, value.split(',')[:])
+
+for value in test_features['tag'].values:
+   all_tags = np.append(all_tags, value.split(','))
+
+
+print(np.unique(all_tags))
+
+
 train_features = pd.concat([train_features.drop('tag', 1), train_features['tag'].str.get_dummies(sep=",")], 1)
 test_features = pd.concat([test_features.drop('tag', 1), test_features['tag'].str.get_dummies(sep=",")], 1)
 
-# for i, j in enumerate(new_df.columns):
-#     print(i, j)
+# for i, j in enumerate(train_features.columns):
+#    # if j not in train_features.columns:
+#    print(i,j)
+
 
 #convert the labels to numbers
 le = preprocessing.LabelEncoder()

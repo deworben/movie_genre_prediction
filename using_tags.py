@@ -18,12 +18,6 @@ train_labels = pd.read_csv('train_labels.tsv', sep='\t')
 test_features = pd.read_csv('./data/valid_features.tsv', sep='\t')
 test_labels = pd.read_csv('./data/valid_labels.tsv', sep='\t')
 
-# print(len(train_features["tag"].unique()))
-# print(len(train_features))
-
-# enc = OneHotEncoder(handle_unknown='ignore')
-# enc.fit(train_features["tag"].values.reshape(-1, 1))
-# print(enc.categories_)
 
 #an array with all of the possible tag values
 all_tags = np.array([])
@@ -34,15 +28,8 @@ for value in test_features['tag'].values:
    all_tags = np.append(all_tags, value.split(','))
 
 
-print(np.unique(all_tags))
-
-
 train_features = pd.concat([train_features.drop('tag', 1), train_features['tag'].str.get_dummies(sep=",")], 1)
 test_features = pd.concat([test_features.drop('tag', 1), test_features['tag'].str.get_dummies(sep=",")], 1)
-
-# for i, j in enumerate(train_features.columns):
-#    # if j not in train_features.columns:
-#    print(i,j)
 
 
 #convert the labels to numbers

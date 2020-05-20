@@ -38,6 +38,8 @@ def class_accuracy(confusion):
 
 sid = SentimentIntensityAnalyzer()
 def row_sentiment(sent):
+    #Credits
+    #https://medium.com/@b.terryjack/nlp-pre-trained-sentiment-analysis-1eb52a9d742c 
     sent = " ".join(sent.split(','))
     sent = " ".join(sent.split('_'))
     sentiment = sid.polarity_scores(sent)

@@ -12,7 +12,7 @@ from sklearn import svm
 import seaborn as sn
 
 import nltk
-# nltk.download('vader_lexicon')
+nltk.download('vader_lexicon')
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import matplotlib     
 matplotlib.rc('xtick', labelsize=6) 
@@ -20,8 +20,22 @@ matplotlib.rc('xtick', labelsize=6)
 import matplotlib.pyplot as plt
 from sklearn.metrics import plot_confusion_matrix
 #possible genres
-genre_list =['Action','Adventure','Animation','Children','Comedy','Crime','Documentary','Drama', 'Fantasy','Film noir',
+GENRE_LIST =['Action','Adventure','Animation','Children','Comedy','Crime','Documentary','Drama', 'Fantasy','Film noir',
             'Horror','Musical','Mystery','Romance','Sci ﬁ','Thriller','War','Western']
+
+#Filepaths of tsv files - Note, requires all of these to run
+test_features_tsv = 'test_features.tsv'
+
+train_features_tsv = 'train_features.tsv'
+train_labels_tsv = 'train_labels.tsv'
+
+initial_test_features_tsv = 'valid_features.tsv'
+initial_test_labels_tsv = 'valid_labels.tsv'
+
+
+
+#Instance of entiment analyser class for use with senitment analysis
+sid = SentimentIntensityAnalyzer()
 
 def accuracy(confusion_matrix):
    diagonal_sum = confusion_matrix.trace()
@@ -32,14 +46,14 @@ def accuracy(confusion_matrix):
 def class_accuracy(cm):
     #for class of interest, proportion correctly identified is the entry on that row corresponding to the matrix diagonal, 
     #divided by the sum of all entries on that row
-    for i in range(len(genre_list)):
+    for i in range(len(GENRE_LIST)):
         total = sum(cm[i])
         correct = cm[i][i]
         correct_proportion = correct / total
-        print("correct for genre:" + genre_list[i] + ": " + str(correct_proportion) + "%")
+        print("correct for genre:" + GENRE_LIST[i] + ": " + str(correct_proportion) + "%")
     return 
 
-sid = SentimentIntensityAnalyzer()
+#Perform the suntiment analysis on each tag
 def row_sentiment(sent):
     #Credits
     #https://medium.com/@b.terryjack/nlp-pre-trained-sentiment-analysis-1eb52a9d742c 
@@ -48,12 +62,13 @@ def row_sentiment(sent):
     sentiment = sid.polarity_scores(sent)
     return pd.Series(sentiment)
 
+#Add the sentiment values to the dows of the dataframe
 def add_sentiment_to_df(df):
     df[['neg','neu', 'pos', 'compound']] = df.apply(lambda row: row_sentiment(row['tag']), axis=1)
     return df
 
-
-def clean_rows(test_set, validation_set):
+#Clean dirty columns
+def clean_rows(test_set, validation_set=None):
     first_type = None
     a = None
     bad_rows = []
@@ -65,7 +80,6 @@ def clean_rows(test_set, validation_set):
             
             if type(element) != first_type:
                 bad_rows.append(j)
-                # print(col + " " + str(j) + " " + str(element))
 
             if col == 'year':
                 try:
@@ -76,15 +90,48 @@ def clean_rows(test_set, validation_set):
 
     bad_rows.sort(reverse=True)
     bad_rows = np.unique(np.array(bad_rows))
-    print(bad_rows)
+
     for i in bad_rows:
         test_set = test_set.drop(i, axis=0)
         validation_set = validation_set.drop(i, axis=0)
+
     test_set.reset_index(drop=True, inplace=True)
     validation_set.reset_index(drop=True, inplace=True)
+    
+ 
     return (test_set, validation_set)
 
 
+#Clean the final_features data independently
+def clean_final_features(final_features):
+    test_set = final_features
+    first_type = None
+    a = None
+    bad_rows = []
+    for col in test_set:
+        for j, element in enumerate(test_set[col]):
+            if j==0:
+                first_type = type(element)
+                continue
+            
+            if type(element) != first_type:
+                bad_rows.append(j)
+
+            if col == 'year':
+                try:
+                    a = int(element)
+                except:
+                    bad_rows.append(j)
+
+    bad_rows.sort(reverse=True)
+    bad_rows = np.unique(np.array(bad_rows))
+    for bad_row_num in bad_rows:
+        for i, col in enumerate(test_set):
+            if col == 'movieId':
+                continue
+            else:
+                test_set.iloc[bad_row_num, i] = '0'
+    return test_set
 
 #Returns the same arrays back with numbers instead of words
 def column_str_to_int(train_set, validation_set, col):
@@ -112,21 +159,23 @@ def pca_cols(df, col_names, n_cols, new_name_prefix):
     n_cols = [new_name_prefix+str(i) for i in range(n_cols)]
     temp = pd.DataFrame(prinComp, columns=n_cols)
     returnVal = pd.concat([df.drop(df[col_names], 1), temp], 1, sort=False)
-    # print(list(pca.explained_variance_ratio_))
-    # print('----------')
     return returnVal
 
+#Import the train and test data
+train_features = pd.read_csv(train_features_tsv, sep='\t')
+train_labels = pd.read_csv(train_labels_tsv, sep='\t')
 
-train_features = pd.read_csv('train_features.tsv', sep='\t')
-train_labels = pd.read_csv('train_labels.tsv', sep='\t')
+test_features = pd.read_csv(initial_test_features_tsv, sep='\t')
+test_labels = pd.read_csv(initial_test_labels_tsv, sep='\t')
 
-test_features = pd.read_csv('valid_features.tsv', sep='\t')
-test_labels = pd.read_csv('valid_labels.tsv', sep='\t')
+final_features = pd.read_csv(test_features_tsv, sep='\t')
 
 
 # #Clean the data
 train_features, train_labels = clean_rows(train_features, train_labels)
 test_features, test_labels = clean_rows(test_features, test_labels)
+
+final_features = clean_final_features(final_features)
 
 
 #Perform PCA on the train features twice, once on the video, and once on the audio
@@ -136,9 +185,14 @@ train_features = pca_cols(train_features, ["ivec"+str(i) for i in range(1, 21)],
 test_features = pca_cols(test_features, ["avf"+str(i) for i in range(1, 108)], 1, "new_vid_")
 test_features = pca_cols(test_features, ["ivec"+str(i) for i in range(1, 21)], 5, "new_audio_")
 
+final_features = pca_cols(final_features, ["avf"+str(i) for i in range(1, 108)], 1, "new_vid_")
+final_features = pca_cols(final_features, ["ivec"+str(i) for i in range(1, 21)], 5, "new_audio_")
+
+
 # add sentiment analysis features to featureset
 train_features = add_sentiment_to_df(train_features)
 test_features = add_sentiment_to_df(test_features)
+final_features = add_sentiment_to_df(final_features)
 
 
 #Normalise data
@@ -147,98 +201,76 @@ train_features = pd.concat([train_features.iloc[:,0:5], transform], 1, sort=Fals
 
 transform = pd.DataFrame(StandardScaler().fit_transform(test_features.iloc[:, 5:]), columns=test_features.columns[5:])
 test_features = pd.concat([test_features.iloc[:,0:5], transform], 1, sort=False)
-# print(train_features)
+
+transform = pd.DataFrame(StandardScaler().fit_transform(final_features.iloc[:, 5:]), columns=final_features.columns[5:])
+final_features = pd.concat([final_features.iloc[:,0:5], transform], 1, sort=False)
+
 
 
 #concatenate the training and test data for one-hot encoding and genre tokenizing
 concat_features = pd.concat([train_features, test_features], ignore_index=True)
+concat_final_features = pd.concat([train_features, final_features], ignore_index=True)
 concat_labels = pd.concat([train_labels, test_labels], ignore_index=True)
 
 
 # apply one hot encoding to tags
 concat_features = pd.concat([concat_features.drop('tag', 1), concat_features['tag'].str.get_dummies(sep=",")], 1)
+concat_final_features = pd.concat([concat_final_features.drop('tag', 1), concat_final_features['tag'].str.get_dummies(sep=",")], 1)
 
-# train_labels, test_labels = column_str_to_int(train_labels, test_labels, 'genres')
-# train_features,test_features = column_str_to_int(train_features, test_features, 'title')
 
 
 #turn genres into numbers for use by MLP classifier
 le = preprocessing.LabelEncoder()
 concat_labels = le.fit_transform(concat_labels['genres'])
-# print(concat_labels)
 
 #split the features and labels back into train and test sets
-features_end_index = len(train_features) 
+features_end_index = len(train_features)
 train_features = concat_features.iloc[:features_end_index,:]
-train_labels = concat_labels[:features_end_index]
-# print(train_features.columns)
+train_labels_num = concat_labels[:features_end_index]
 
 test_features = concat_features.iloc[features_end_index:,:]
 test_labels = concat_labels[features_end_index:]
 
+final_features = concat_final_features.iloc[features_end_index:, :]
 
-#Tokenise these lines
+
+#Drop any lines that don't improve classifier performance
 train_features = train_features.drop('YTId', axis=1)
 test_features = test_features.drop('YTId', axis=1)
+final_features = final_features.drop('YTId', axis=1)
 
 train_features = train_features.drop('title', axis=1)
 test_features = test_features.drop('title', axis=1)
+final_features = final_features.drop('title', axis=1)
 
 train_features = train_features.drop('movieId', axis=1)
 test_features = test_features.drop('movieId', axis=1)
+final_features = final_features.drop('movieId', axis=1)
 
-# train_features = train_features.drop('year', axis=1)
-# test_features = test_features.drop('year', axis=1)
+train_features = train_features.drop('year', axis=1)
+test_features = test_features.drop('year', axis=1)
+final_features = final_features.drop('year', axis=1)
 
-print(list(train_features.columns))
-print(train_features)
-print(len(test_labels))
-
-for i in range(5, 15):
-    for j in range(5, 15):
-
-        if(j > i*1.5):
-            continue
-        # Initialise the model
-        clf = MLPClassifier(solver='sgd', 
-                    hidden_layer_sizes=(i,j), random_state=4, max_iter=500000, learning_rate_init = 0.1, activation = 'logistic')
-        # clf = svm.LinearSVC(max_iter=500000)
-        # clf = svm.SVC(max_iter=500000, decision_function_shape='ovo')
-        # clf = svm.SVC()
-
-        #Train the model based on training features and actual classes
-        clf.fit(train_features, train_labels)
+#Create an MLP classifier
+clf = MLPClassifier(solver='sgd', 
+            hidden_layer_sizes=(5,7), random_state=4, max_iter=500000, learning_rate_init = 0.1, activation = 'logistic')
 
 
-
-        #Use the trained model to predict some classes given the features
-        features_predicted = clf.predict(test_features)
-        cm = confusion_matrix(features_predicted, test_labels)
-        print("i={}, j={}. Accuracy of MLPClassifier : {}".format(i, j, accuracy(cm)))
+#Train the model based on training features and actual classes
+clf.fit(train_features, train_labels_num)
 
 
-        # #call the function for the audio data
-        # print("by-class accuracy for the audio data:\n")
-        # class_accuracy(cm)
+#If using labelled test data 
+# print(accuracy(confusion_matrix(features_predicted, test_labels)))
 
 
-        #test for overfitting
-        train_pred = clf.predict(train_features)
-        cm = confusion_matrix(train_pred, train_labels)
-        print("i={}, j={}. Check overfitting of MLPClassifier : {}".format(i, j, accuracy(cm)))
-        print()
+# Use the trained model to predict some classes given the features
+features_predicted = clf.predict(final_features)
 
+#Format into readable genres
+features_predicted = [GENRE_LIST[elem] for elem in features_predicted] 
+final_features = pd.read_csv(test_features_tsv, sep='\t')
+outputDf = pd.concat([final_features['movieId'], pd.DataFrame(features_predicted)], axis=1)
 
-        # titles_options = [("Confusion matrix, without normalization", None), ("Normalized confusion matrix", 'true')]
-        # for title, normalize in titles_options:
-        #     disp = plot_confusion_matrix(clf, test_features, test_labels,
-        #                                 display_labels=genre_list,
-        #                                 cmap=plt.cm.Blues,
-        #                                 normalize=normalize)
-        #     disp.ax_.set_title(title)
-        #     # print(title)
-        #     # print(disp.confusion_matrix)
-
-        #     plt.figure(figsize = (10,7))
-        #     plt.show()
-
+#Export the predictions to ass_2_out.csv
+outputDf.to_csv('ass_2_out.csv')

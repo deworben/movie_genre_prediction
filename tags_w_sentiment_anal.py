@@ -59,7 +59,6 @@ Y_val = pd.read_csv('valid_labels.tsv', sep='\t')
 
 # add sentiment analysis features to featureset
 X_train = add_sentiment_to_df(X_train)
-print(X_train)
 X_train = X_train.drop('tag', axis=1)
 
 # add sentiment analysis features to featureset
@@ -108,9 +107,11 @@ def column_str_to_int(train_set, validation_set, col):
 
 #Tokenise these lines
 Y_train, Y_val = column_str_to_int(Y_train, Y_val, 'genres')
-X_train,X_val = column_str_to_int(X_train, X_val, 'title')
+# X_train,X_val = column_str_to_int(X_train, X_val, 'title')
 # X_train,X_val = column_str_to_int(X_train, X_val, 'tag')
-
+X_train = X_train[['neg', 'neu', 'pos', 'compound']]
+X_val = X_val[['neg', 'neu', 'pos', 'compound']]
+print(list(X_train.columns))
 
 #Put into right shape
 Y_train = np.array(Y_train['genres'])
@@ -138,7 +139,7 @@ for i in range(5, 12):
         cm = confusion_matrix(features_predicted, Y_val)
         print("i={}, j={}. Accuracy of MLPClassifier : {}".format(i, j, accuracy(cm)))
 
-
+        print(cm)
         #test for overfitting
         train_pred = clf.predict(X_train)
         cm = confusion_matrix(train_pred, Y_train)

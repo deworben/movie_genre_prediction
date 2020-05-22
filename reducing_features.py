@@ -77,7 +77,6 @@ concat_labels = pd.concat([train_labels, test_labels], ignore_index=True)
 concat_features = pd.concat([concat_features.drop('tag', 1), concat_features['tag'].str.get_dummies(sep=",")], 1)
 
 
-
 #turn genres into numbers for use by MLP classifier
 le = preprocessing.LabelEncoder()
 concat_labels = le.fit_transform(concat_labels['genres'])
